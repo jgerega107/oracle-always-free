@@ -52,11 +52,13 @@ locals {
 }
 
 resource "oci_core_vcn" "this" {
-  compartment_id = var.compartment_id
-  cidr_block     = var.vcn_cidr
-  display_name   = "${var.name}-vcn"
-  dns_label      = replace(substr(var.name, 0, 15), "-", "")
-  freeform_tags  = local.common_tags
+  compartment_id                   = var.compartment_id
+  cidr_block                       = var.vcn_cidr
+  display_name                     = "${var.name}-vcn"
+  dns_label                        = replace(substr(var.name, 0, 15), "-", "")
+  is_ipv6enabled                   = var.enable_ipv6
+  is_oracle_gua_allocation_enabled = var.enable_ipv6
+  freeform_tags                    = local.common_tags
 }
 
 resource "oci_core_internet_gateway" "this" {
@@ -77,6 +79,16 @@ resource "oci_core_route_table" "public" {
     destination       = "0.0.0.0/0"
     destination_type  = "CIDR_BLOCK"
     network_entity_id = oci_core_internet_gateway.this.id
+  }
+
+  dynamic "route_rules" {
+    for_each = var.enable_ipv6 ? [1] : []
+
+    content {
+      destination       = "::/0"
+      destination_type  = "CIDR_BLOCK"
+      network_entity_id = oci_core_internet_gateway.this.id
+    }
   }
 }
 
@@ -106,22 +118,60 @@ resource "oci_core_security_list" "public" {
     }
   }
 
+  dynamic "ingress_security_rules" {
+    for_each = var.enable_ipv6 ? [1] : []
+
+    content {
+      protocol = "17"
+      source   = "::/0"
+
+      udp_options {
+        min = var.tailscale_udp_port
+        max = var.tailscale_udp_port
+      }
+    }
+  }
+
+  dynamic "ingress_security_rules" {
+    for_each = var.enable_ipv6 ? [1] : []
+
+    content {
+      protocol = "58"
+      source   = "::/0"
+
+      icmp_options {
+        type = 2
+        code = 0
+      }
+    }
+  }
+
   egress_security_rules {
     protocol    = "all"
     destination = "0.0.0.0/0"
   }
+
+  dynamic "egress_security_rules" {
+    for_each = var.enable_ipv6 ? [1] : []
+
+    content {
+      protocol    = "all"
+      destination = "::/0"
+    }
+  }
 }
 
 resource "oci_core_subnet" "public" {
-  compartment_id             = var.compartment_id
-  vcn_id                     = oci_core_vcn.this.id
-  cidr_block                 = var.subnet_cidr
-  display_name               = "${var.name}-public-subnet"
-  dns_label                  = "public"
-  prohibit_public_ip_on_vnic = !var.assign_public_ip
-  route_table_id             = oci_core_route_table.public.id
-  security_list_ids          = [oci_core_security_list.public.id]
-  freeform_tags              = local.common_tags
+  compartment_id            = var.compartment_id
+  vcn_id                    = oci_core_vcn.this.id
+  cidr_block                = var.subnet_cidr
+  display_name              = "${var.name}-public-subnet"
+  dns_label                 = "public"
+  ipv6cidr_block            = var.enable_ipv6 ? cidrsubnet(oci_core_vcn.this.ipv6cidr_blocks[0], 8, var.ipv6_subnet_index) : null
+  prohibit_internet_ingress = !(var.assign_public_ip || var.enable_ipv6)
+  route_table_id            = oci_core_route_table.public.id
+  security_list_ids         = [oci_core_security_list.public.id]
+  freeform_tags             = local.common_tags
 }
 
 resource "oci_core_instance" "this" {
@@ -138,6 +188,7 @@ resource "oci_core_instance" "this" {
 
   create_vnic_details {
     subnet_id        = oci_core_subnet.public.id
+    assign_ipv6ip    = var.enable_ipv6
     assign_public_ip = var.assign_public_ip
     display_name     = "${var.name}-vnic"
     hostname_label   = replace(substr(var.name, 0, 15), "-", "")

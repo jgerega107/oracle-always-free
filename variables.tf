@@ -92,7 +92,7 @@ variable "a1_memory_in_gbs" {
 variable "oracle_linux_version" {
   description = "Oracle Linux major version to use. OCI's newest matching image is selected."
   type        = string
-  default     = "9"
+  default     = "10"
 }
 
 variable "boot_volume_size_in_gbs" {
@@ -116,6 +116,23 @@ variable "subnet_cidr" {
   description = "CIDR block for the public subnet."
   type        = string
   default     = "10.0.0.0/24"
+}
+
+variable "enable_ipv6" {
+  description = "Enable OCI-native IPv6 with an Oracle-allocated GUA prefix. VCN IPv6 support has no separate resource charge; internet egress still counts toward OCI outbound data transfer limits."
+  type        = bool
+  default     = true
+}
+
+variable "ipv6_subnet_index" {
+  description = "Subnet index used to carve a /64 from the Oracle-allocated VCN /56 when enable_ipv6 is true. Valid range is 0-255."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.ipv6_subnet_index == floor(var.ipv6_subnet_index) && var.ipv6_subnet_index >= 0 && var.ipv6_subnet_index <= 255
+    error_message = "ipv6_subnet_index must be a whole number between 0 and 255."
+  }
 }
 
 variable "freeform_tags" {

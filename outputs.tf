@@ -18,6 +18,16 @@ output "private_ip" {
   value       = oci_core_instance.this.private_ip
 }
 
+output "vcn_ipv6_cidr_blocks" {
+  description = "Oracle-allocated IPv6 /56 prefixes on the VCN when IPv6 is enabled."
+  value       = oci_core_vcn.this.ipv6cidr_blocks
+}
+
+output "subnet_ipv6_cidr_block" {
+  description = "IPv6 /64 prefix assigned to the public subnet when IPv6 is enabled."
+  value       = try(oci_core_subnet.public.ipv6cidr_block, null)
+}
+
 output "selected_image_id" {
   description = "OCID of the selected latest Oracle Linux image."
   value       = data.oci_core_images.oracle_linux.images[0].id

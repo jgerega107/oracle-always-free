@@ -24,10 +24,20 @@ tailscale_hostname = "always-free-arm"
 create_admin_user = true
 default_user      = "admin"
 
+# Latest Oracle Linux major release to use for the selected OCI image.
+oracle_linux_version = "10"
+
 # Always Free A1 guardrails. Defaults already match these values, but they are
 # shown here to make the intended free-tier size explicit.
-a1_ocpus          = 2
-a1_memory_in_gbs  = 12
+a1_ocpus         = 2
+a1_memory_in_gbs = 12
+
+# OCI-native IPv6 is enabled by default with an Oracle-allocated GUA /56 on the
+# VCN, a /64 on the subnet, and one IPv6 address on the instance VNIC. There is
+# no separate IPv6 address charge; outbound internet transfer still counts toward
+# OCI's data transfer limits.
+enable_ipv6       = true
+ipv6_subnet_index = 0
 
 # Always Free block storage is 200 GB total for boot and block volumes combined.
 # Leave at 200 only if this module should consume the full free storage pool.
