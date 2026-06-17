@@ -1,0 +1,20 @@
+{
+  "identities": [
+    {
+      "name": "opentofu",
+      "credentials": [
+        {
+          "accessKey": "tofu-state",
+          "secretKey": "replace-with-a-long-random-secret"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging"
+      ]
+    }
+  ]
+}

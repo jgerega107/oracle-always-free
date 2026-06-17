@@ -1,0 +1,44 @@
+# Copy this file to main.tfvars and replace the placeholder values.
+# main.tfvars is ignored by git because it contains environment-specific values
+# and the Tailscale auth key is sensitive.
+
+# OCI home region for this tenancy. Always Free compute and block volume resources
+# must be created in the tenancy home region to remain Always Free.
+region = "us-ashburn-1"
+
+# Compartment OCID where the VM, networking, and budget will live.
+compartment_id = "ocid1.compartment.oc1..replace_me"
+
+# Public key installed for the default Oracle Linux user and optional admin user.
+ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIReplaceMe user@example"
+
+# Tailscale auth key used by cloud-init. Prefer an ephemeral, pre-approved,
+# reusable key scoped with tags. This value is stored in OpenTofu state.
+tailscale_auth_key = "tskey-auth-replace_me"
+
+# Optional: module resource prefix and Tailscale hostname.
+name               = "always-free-arm"
+tailscale_hostname = "always-free-arm"
+
+# Optional: create a sudo-capable cloud-init user in addition to opc.
+create_admin_user = true
+default_user      = "admin"
+
+# Always Free A1 guardrails. Defaults already match these values, but they are
+# shown here to make the intended free-tier size explicit.
+a1_ocpus          = 2
+a1_memory_in_gbs  = 12
+
+# Always Free block storage is 200 GB total for boot and block volumes combined.
+# Leave at 200 only if this module should consume the full free storage pool.
+boot_volume_size_in_gbs = 200
+
+# Public IPv4 is optional for this Tailscale-first setup. Keep true if you want
+# direct internet egress/ingress for the opened Tailscale UDP port.
+assign_public_ip = true
+
+# Budget alert guardrail. OCI budgets require a positive threshold; this alerts
+# when actual spend reaches at least $0.01, but does not prevent charges.
+budget_alert_email     = "you@example.com"
+budget_amount          = 1
+budget_alert_threshold = 0.01

@@ -1,0 +1,15 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.lock.hcl
+
+# Local secrets / environment-specific files
+*.tfvars
+!*.tfvars.example
+backend.tf
+seaweedfs/s3.json
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
