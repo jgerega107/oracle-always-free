@@ -61,6 +61,12 @@ resource "oci_core_vcn" "this" {
   freeform_tags                    = local.common_tags
 }
 
+resource "oci_core_default_security_list" "this" {
+  manage_default_resource_id = oci_core_vcn.this.default_security_list_id
+  display_name               = "${var.name}-default-security-list"
+  freeform_tags              = local.common_tags
+}
+
 resource "oci_core_internet_gateway" "this" {
   compartment_id = var.compartment_id
   vcn_id         = oci_core_vcn.this.id

@@ -252,6 +252,14 @@ add_import() {
 VCN_ID="$(find_one_by_display_name "VCN" "${NAME}-vcn" required network vcn list --compartment-id "$COMPARTMENT_ID" --all)"
 add_import "oci_core_vcn.this" "$VCN_ID"
 
+VCN_JSON="$("${OCI_CMD[@]}" network vcn get --vcn-id "$VCN_ID" --output json)"
+DEFAULT_SECURITY_LIST_ID="$(jq -r '.data."default-security-list-id" // empty' <<<"$VCN_JSON")"
+if [[ -z "$DEFAULT_SECURITY_LIST_ID" ]]; then
+  echo "Could not determine default security list ID for VCN ${VCN_ID}." >&2
+  exit 1
+fi
+add_import "oci_core_default_security_list.this" "$DEFAULT_SECURITY_LIST_ID"
+
 IGW_ID="$(find_one_by_display_name "internet gateway" "${NAME}-igw" required network internet-gateway list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --all)"
 add_import "oci_core_internet_gateway.this" "$IGW_ID"
 

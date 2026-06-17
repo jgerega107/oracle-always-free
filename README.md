@@ -12,11 +12,12 @@ This OpenTofu module provisions an Oracle Cloud Infrastructure Always Free ARM V
 - Tailscale installed and joined via cloud-init using Tailscale's official install script
 - Optional cloud-init-created sudo default user, enabled by default
 - OCI-native IPv6 enabled by default with an Oracle-allocated VCN /56, subnet /64, and instance VNIC IPv6 address
-- No public SSH ingress rule
+- The VCN's automatic default security list is managed empty to remove OCI default SSH ingress rules
+- No public SSH ingress rule on the subnet's active security list
 - UDP `41641` opened for Tailscale direct WireGuard connections on IPv4 and IPv6
 - Monthly budget alert to `example@gmail.com` by default when actual cost reaches `$0.01`
 
-The module also creates one small public dual-stack VCN, subnet, internet gateway, route table, and security list for Tailscale connectivity. The budget alert is a guardrail only; it does not prevent charges.
+The module also creates one small public dual-stack VCN, subnet, internet gateway, route table, and custom security list for Tailscale connectivity. OCI still creates a default security list for every VCN; this module adopts it and keeps it empty so its default SSH rules cannot be accidentally used. The budget alert is a guardrail only; it does not prevent charges.
 
 > OCI Always Free compute and block volume resources must be created in the tenancy home region. Availability can also be capacity constrained by region and availability domain, so OpenTofu may fail with an OCI capacity error even though the configuration is within Always Free limits.
 
@@ -131,7 +132,7 @@ Reviewed Oracle documentation:
 - Oracle's public price list may describe a larger monthly free A1 allowance for broader account types. This module intentionally follows the stricter Always Free Resources page so an Always-Free-only tenancy remains inside the documented limits.
 - This module consumes the full stricter A1 pool for an Always-Free-only tenancy. Do not run other A1 VMs, A1 bare metal instances, or A1-backed container instances in the same monthly free allowance unless you reduce `a1_ocpus` and `a1_memory_in_gbs` here.
 - Always Free block volume storage is `200 GB` total for boot volumes and block volumes combined in the home region, plus five total volume backups. This module creates one boot volume, creates no attached block volumes, and creates no backups. Because the default boot volume is `200 GB`, reduce `boot_volume_size_in_gbs` if other boot or block volumes need to stay within the same free storage pool.
-- Free Tier tenancies can have up to `2` VCNs. This module creates `1` VCN with one subnet, route table, internet gateway, and security list.
+- Free Tier tenancies can have up to `2` VCNs. This module creates `1` VCN with one subnet, route table, internet gateway, custom security list, and managed-empty default security list.
 - Oracle documents IPv6 support as part of VCNs, and OCI's price list does not list a separate charge for Oracle-allocated IPv6 GUA prefixes or IPv6 addresses. IPv6 outbound internet transfer still counts toward the same OCI networking data transfer limits.
 - OCI documents IPv6 enablement as effectively one-way for a VCN/subnet: after IPv6 is enabled, the VCN/subnet can't simply become IPv4-only again. Set `enable_ipv6 = false` before the first apply if you do not want OCI-native IPv6.
 - OCI includes `10 TB` per month of outbound data transfer. Terraform cannot cap IPv4 or IPv6 network egress, so workloads on the VM still need to stay below that usage.
