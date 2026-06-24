@@ -207,6 +207,12 @@ resource "oci_core_instance" "this" {
     boot_volume_size_in_gbs = var.boot_volume_size_in_gbs
   }
 
+  lifecycle {
+    ignore_changes = [
+      source_details[0].source_id
+    ]
+  }
+
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
     user_data           = base64encode(local.tailscale_cloud_init)

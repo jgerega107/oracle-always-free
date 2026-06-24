@@ -28,14 +28,18 @@ output "subnet_ipv6_cidr_block" {
   value       = try(oci_core_subnet.public.ipv6cidr_block, null)
 }
 
+data "oci_core_image" "selected" {
+  image_id = oci_core_instance.this.source_details[0].source_id
+}
+
 output "selected_image_id" {
-  description = "OCID of the selected latest Oracle Linux image."
-  value       = data.oci_core_images.oracle_linux.images[0].id
+  description = "OCID of the Oracle Linux image used by the instance."
+  value       = oci_core_instance.this.source_details[0].source_id
 }
 
 output "selected_image_name" {
-  description = "Display name of the selected latest Oracle Linux image."
-  value       = data.oci_core_images.oracle_linux.images[0].display_name
+  description = "Display name of the Oracle Linux image used by the instance."
+  value       = data.oci_core_image.selected.display_name
 }
 
 output "availability_domain" {
