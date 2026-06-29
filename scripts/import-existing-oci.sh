@@ -22,7 +22,8 @@ Options:
   --var-file PATH        tfvars file to read. Default: main.tfvars
   --name NAME            Module name prefix. Defaults to var.name, then always-free-arm
   --compartment-id OCID  Compartment OCID. Defaults to var.compartment_id
-  --region REGION        OCI region. Defaults to var.region
+  --tenancy-id OCID      Tenancy OCID. Defaults to OCI CLI config tenancy
+  --region REGION        OCI region. Defaults to var.region, then OCI CLI config region
   --profile PROFILE      OCI CLI profile to use
   --execute              Actually run tofu import. Without this, prints a dry run
   --skip-budget          Do not discover or import budget and alert-rule resources
@@ -33,6 +34,7 @@ Options:
 Environment:
   TOFU_BIN               OpenTofu binary to use. Default: tofu
   OCI_CLI_PROFILE        OCI CLI profile, if --profile is not set
+  OCI_CLI_CONFIG_FILE    OCI CLI config path. Default: ~/.oci/config
   TF_VAR_name            Fallback for --name
   TF_VAR_compartment_id  Fallback for --compartment-id
   TF_VAR_region          Fallback for --region
@@ -55,6 +57,7 @@ MODULE_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 VAR_FILE="main.tfvars"
 NAME=""
 COMPARTMENT_ID=""
+TENANCY_ID=""
 REGION=""
 PROFILE="${OCI_CLI_PROFILE:-}"
 EXECUTE=0
@@ -75,6 +78,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --compartment-id)
       COMPARTMENT_ID="${2:?--compartment-id requires an OCID}"
+      shift 2
+      ;;
+    --tenancy-id)
+      TENANCY_ID="${2:?--tenancy-id requires an OCID}"
       shift 2
       ;;
     --region)
@@ -167,10 +174,40 @@ tfvar() {
   ' "$VAR_FILE_PATH"
 }
 
+oci_config_value() {
+  local key="$1"
+  local config_file="${OCI_CLI_CONFIG_FILE:-$HOME/.oci/config}"
+  local profile_name="${PROFILE:-DEFAULT}"
+
+  if [[ ! -f "$config_file" ]]; then
+    return 0
+  fi
+
+  awk -v profile="$profile_name" -v key="$key" '
+    /^[[:space:]]*[#;]/ { next }
+    /^[[:space:]]*\[/ {
+      section = $0
+      sub(/^[[:space:]]*\[/, "", section)
+      sub(/\][[:space:]]*$/, "", section)
+      in_profile = (section == profile)
+      next
+    }
+    in_profile && $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
+      line = $0
+      sub(/^[^=]*=/, "", line)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      print line
+      exit
+    }
+  ' "$config_file"
+}
+
 NAME="${NAME:-${TF_VAR_name:-$(tfvar name)}}"
 NAME="${NAME:-always-free-arm}"
 COMPARTMENT_ID="${COMPARTMENT_ID:-${TF_VAR_compartment_id:-$(tfvar compartment_id)}}"
+TENANCY_ID="${TENANCY_ID:-$(oci_config_value tenancy)}"
 REGION="${REGION:-${TF_VAR_region:-$(tfvar region)}}"
+REGION="${REGION:-$(oci_config_value region)}"
 
 if [[ -z "$COMPARTMENT_ID" ]]; then
   echo "Could not determine compartment_id. Set it in $VAR_FILE or pass --compartment-id." >&2
@@ -205,13 +242,30 @@ find_one_by_display_name() {
   echo "Discovering ${label}: ${display_name}" >&2
 
   local json
-  if ! json="$("${OCI_CMD[@]}" "$@" --output json)"; then
+  local err_file
+  local err
+  err_file="$(mktemp)"
+  if ! json="$("${OCI_CMD[@]}" "$@" --output json 2>"$err_file")"; then
+    err="$(cat "$err_file")"
+    rm -f "$err_file"
+
     echo "Failed to list ${label}." >&2
-    exit 1
+    if [[ -n "$err" ]]; then
+      echo "$err" >&2
+    fi
+
+    if [[ "$required" == "required" ]]; then
+      exit 1
+    fi
+    return 1
   fi
+  rm -f "$err_file"
 
   local ids=()
-  mapfile -t ids < <(
+  local id
+  while IFS= read -r id; do
+    ids+=("$id")
+  done < <(
     jq -r --arg display_name "$display_name" '
       .data[]?
       | select(."display-name" == $display_name)
@@ -276,10 +330,23 @@ INSTANCE_ID="$(find_one_by_display_name "compute instance" "$NAME" required comp
 add_import "oci_core_instance.this" "$INSTANCE_ID"
 
 if [[ "$SKIP_BUDGET" -eq 0 ]]; then
-  if BUDGET_ID="$(find_one_by_display_name "budget" "${NAME}-cost-alert-budget" optional budgets budget list --compartment-id "$COMPARTMENT_ID" --all)"; then
+  BUDGET_ID=""
+
+  if BUDGET_ID="$(find_one_by_display_name "budget in compartment ${COMPARTMENT_ID}" "${NAME}-cost-alert-budget" optional budgets budget budget list --compartment-id "$COMPARTMENT_ID" --all)"; then
+    :
+  elif [[ -n "$TENANCY_ID" && "$TENANCY_ID" != "$COMPARTMENT_ID" ]]; then
+    echo "Retrying budget lookup in tenancy ${TENANCY_ID}." >&2
+    if BUDGET_ID="$(find_one_by_display_name "budget in tenancy ${TENANCY_ID}" "${NAME}-cost-alert-budget" optional budgets budget budget list --compartment-id "$TENANCY_ID" --all)"; then
+      :
+    else
+      BUDGET_ID=""
+    fi
+  fi
+
+  if [[ -n "$BUDGET_ID" ]]; then
     add_import "oci_budget_budget.this" "$BUDGET_ID"
 
-    if ALERT_RULE_ID="$(find_one_by_display_name "budget alert rule" "${NAME}-any-cost-alert" optional budgets alert-rule list --budget-id "$BUDGET_ID" --all)"; then
+    if ALERT_RULE_ID="$(find_one_by_display_name "budget alert rule" "${NAME}-any-cost-alert" optional budgets budget alert-rule list --budget-id "$BUDGET_ID" --all)"; then
       add_import "oci_budget_alert_rule.any_cost" "budgets/${BUDGET_ID}/alertRules/${ALERT_RULE_ID}"
     fi
   fi

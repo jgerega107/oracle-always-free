@@ -59,6 +59,12 @@ resource "oci_core_vcn" "this" {
   is_ipv6enabled                   = var.enable_ipv6
   is_oracle_gua_allocation_enabled = var.enable_ipv6
   freeform_tags                    = local.common_tags
+
+  lifecycle {
+    ignore_changes = [
+      is_oracle_gua_allocation_enabled, # https://github.com/oracle/terraform-provider-oci/issues/2215
+    ]
+  }
 }
 
 resource "oci_core_default_security_list" "this" {
@@ -209,7 +215,9 @@ resource "oci_core_instance" "this" {
 
   lifecycle {
     ignore_changes = [
-      source_details[0].source_id
+      create_vnic_details[0].assign_ipv6ip, # https://github.com/oracle/terraform-provider-oci/issues/2215
+      metadata,
+      source_details[0].source_id,
     ]
   }
 
