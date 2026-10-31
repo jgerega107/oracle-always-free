@@ -8,7 +8,6 @@
 *.tfvars
 !*.tfvars.example
 backend.tf
-seaweedfs/s3.json
 
 # Editor / OS noise
 .DS_Store

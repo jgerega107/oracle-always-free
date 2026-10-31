@@ -99,15 +99,16 @@ By default, cloud-init creates a non-root `admin` user, controlled by `default_u
 
 This is safer than enabling direct root login. Oracle Linux images also include the default `opc` user, so set `create_admin_user = false` if you prefer to use only `opc`.
 
-## Optional SeaweedFS remote state
+## Local backend configuration
 
-This module defaults to local OpenTofu state. If you want self-hosted S3-compatible remote state, see:
+This module defaults to local OpenTofu state. To use a remote backend, create a
+`backend.tf` in the module root containing a `terraform { backend "..." { ... } }`
+block. OpenTofu loads it automatically alongside the other `.tf` files.
+`backend.tf` is ignored by Git so environment-specific backend settings stay local.
 
-- `backend-seaweedfs.tf.example`
-- `seaweedfs/docker-compose.yml`
-- `seaweedfs/README.md`
-
-The optional backend example uses SeaweedFS S3 plus OpenTofu state/plan encryption with PBKDF2 + AES-GCM.
+Run `tofu init` to initialize the backend, or `tofu init -migrate-state` when moving
+existing state to a different backend. Keep the same backend configuration on every
+machine that manages these resources.
 
 ## Import existing resources
 
