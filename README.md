@@ -64,6 +64,7 @@ The OCI provider can use your standard OCI CLI config from `~/.oci/config`, envi
 | `tailscale_hostname` | `null` | Hostname registered in Tailscale. Defaults to `name`. |
 | `tailscale_enable_ssh` | `true` | Adds `--ssh` to `tailscale up` so you can use Tailscale SSH. |
 | `tailscale_udp_port` | `41641` | Public UDP port opened for Tailscale direct connections. |
+| `extra_ingress_rules` | `[]` | Additional CIDR-based ingress rules appended to the built-in rules. |
 | `create_admin_user` | `true` | Creates a non-root sudo-capable user via cloud-init. |
 | `default_user` | `admin` | Username for the sudo-capable cloud-init user. |
 | `availability_domain` | `null` | Uses the first AD if omitted. Set this if your region has capacity in a specific AD. |
@@ -75,6 +76,40 @@ The OCI provider can use your standard OCI CLI config from `~/.oci/config`, envi
 | `boot_volume_size_in_gbs` | `200` | Maximum Always Free combined boot/block volume storage used as this VM's boot disk. |
 | `budget_alert_email` | `example@gmail.com` | Email recipient for the budget alert. |
 | `budget_alert_threshold` | `0.01` | OCI budgets require a positive threshold, so this approximates “any cost.” |
+
+## Additional ingress rules
+
+Set `extra_ingress_rules` in your variables file or module arguments. These rules
+are appended to the built-in Tailscale and ICMP rules:
+
+```hcl
+extra_ingress_rules = [
+  {
+    description = "Public HTTPS"
+    source      = "0.0.0.0/0"
+    protocol    = "6"
+    ports       = { min = 443, max = 443 }
+  },
+  {
+    description = "HTTPS from the home network"
+    source      = "2001:db8:1234::/48" # Replace with your actual IPv6 prefix.
+    protocol    = "6"
+    ports       = { min = 443, max = 443 }
+  }
+]
+```
+
+Protocols are `"6"` (TCP), `"17"` (UDP), `"1"` (ICMP), `"58"` (ICMPv6), and
+`"all"`. `ports` specifies a destination port range for TCP/UDP; omitting it
+allows all destination ports. For ICMP, optionally set
+`icmp_options = { type = 8, code = 0 }`; omit `code` to allow every code of that
+type. Rules are stateful unless `stateless = true` is specified.
+
+IPv6 sources require IPv6 connectivity (`enable_ipv6 = true`). Custom rules are
+used as supplied, including IPv6 rules; they are not automatically duplicated or
+removed based on `enable_ipv6`. These rules affect OCI networking; the guest
+firewall and listening service must also permit the traffic. Outbound traffic is
+already allowed, including Alloy sending metrics home.
 
 ## Tailscale notes
 

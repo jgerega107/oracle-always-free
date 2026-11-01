@@ -52,3 +52,13 @@ assign_public_ip = true
 budget_alert_email     = "you@example.com"
 budget_amount          = 1
 budget_alert_threshold = 0.01
+
+# Optional: append ingress rules to the built-in Tailscale and ICMP rules.
+# extra_ingress_rules = [
+#   {
+#     description = "Public HTTPS"
+#     source      = "0.0.0.0/0"
+#     protocol    = "6" # TCP; use "17" for UDP.
+#     ports       = { min = 443, max = 443 }
+#   }
+# ]

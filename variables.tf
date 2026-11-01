@@ -49,6 +49,60 @@ variable "tailscale_udp_port" {
   default     = 41641
 }
 
+variable "extra_ingress_rules" {
+  description = "Additional CIDR-based ingress rules appended to the built-in Tailscale and ICMP rules. Protocol is 6 (TCP), 17 (UDP), 1 (ICMP), 58 (ICMPv6), or all. Omit ports to allow all destination ports."
+  type = list(object({
+    description = optional(string)
+    source      = string
+    protocol    = string
+    stateless   = optional(bool, false)
+    ports = optional(object({
+      min = number
+      max = number
+    }))
+    icmp_options = optional(object({
+      type = number
+      code = optional(number)
+    }))
+  }))
+  default  = []
+  nullable = false
+
+  validation {
+    condition = alltrue([
+      for rule in var.extra_ingress_rules :
+      can(cidrhost(rule.source, 0)) && contains(["6", "17", "1", "58", "all"], rule.protocol)
+    ])
+    error_message = "Each extra ingress rule must have a valid IPv4 or IPv6 source CIDR and protocol 6, 17, 1, 58, or all."
+  }
+
+  validation {
+    condition = alltrue([
+      for rule in var.extra_ingress_rules : rule.ports == null ? true : (
+        contains(["6", "17"], rule.protocol) &&
+        rule.ports.min == floor(rule.ports.min) && rule.ports.max == floor(rule.ports.max) &&
+        rule.ports.min >= 1 && rule.ports.max <= 65535 && rule.ports.min <= rule.ports.max
+      )
+    ])
+    error_message = "ports requires TCP or UDP and integer min/max values between 1 and 65535, with min <= max."
+  }
+
+  validation {
+    condition = alltrue([
+      for rule in var.extra_ingress_rules : rule.icmp_options == null ? true : (
+        contains(["1", "58"], rule.protocol) &&
+        rule.icmp_options.type == floor(rule.icmp_options.type) &&
+        rule.icmp_options.type >= 0 && rule.icmp_options.type <= 255 &&
+        (rule.icmp_options.code == null ? true : (
+          rule.icmp_options.code == floor(rule.icmp_options.code) &&
+          rule.icmp_options.code >= 0 && rule.icmp_options.code <= 255
+        ))
+      )
+    ])
+    error_message = "icmp_options requires ICMP or ICMPv6 and integer type/code values between 0 and 255."
+  }
+}
+
 variable "create_admin_user" {
   description = "Whether cloud-init should create an additional sudo-capable default user."
   type        = bool

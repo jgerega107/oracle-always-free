@@ -158,6 +158,43 @@ resource "oci_core_security_list" "public" {
     }
   }
 
+  dynamic "ingress_security_rules" {
+    for_each = var.extra_ingress_rules
+    iterator = rule
+
+    content {
+      description = rule.value.description
+      protocol    = rule.value.protocol
+      source      = rule.value.source
+      source_type = "CIDR_BLOCK"
+      stateless   = rule.value.stateless
+
+      dynamic "tcp_options" {
+        for_each = rule.value.protocol == "6" && rule.value.ports != null ? [rule.value.ports] : []
+        content {
+          min = tcp_options.value.min
+          max = tcp_options.value.max
+        }
+      }
+
+      dynamic "udp_options" {
+        for_each = rule.value.protocol == "17" && rule.value.ports != null ? [rule.value.ports] : []
+        content {
+          min = udp_options.value.min
+          max = udp_options.value.max
+        }
+      }
+
+      dynamic "icmp_options" {
+        for_each = rule.value.icmp_options == null ? [] : [rule.value.icmp_options]
+        content {
+          type = icmp_options.value.type
+          code = icmp_options.value.code
+        }
+      }
+    }
+  }
+
   egress_security_rules {
     protocol    = "all"
     destination = "0.0.0.0/0"
